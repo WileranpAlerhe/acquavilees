@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { AlertCircle, BadgeCheck, BadgePercent, CheckCircle2, Clock3, Copy, CreditCard, LoaderCircle, LockKeyhole, MapPin, PackageCheck, QrCode, RefreshCw, ShieldCheck, Truck, UserRound } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -79,7 +80,6 @@ export default function CheckoutPage() {
   const [cardDialogState, setCardDialogState] = useState<CardDialogState>("form");
   const [cardError, setCardError] = useState("");
   const [card, setCard] = useState<CardDetails>({ holder: "", number: "", expiry: "", cvv: "", installments: "1" });
-  const numberRef = useRef<HTMLInputElement>(null);
   const pollTimerRef = useRef<number | null>(null);
   const pixCountdownRef = useRef<number | null>(null);
   const cardTimerRef = useRef<number | null>(null);
@@ -118,7 +118,6 @@ export default function CheckoutPage() {
       if (!response.ok || data.erro) throw new Error("CEP inválido");
       setAddress((current) => ({ ...current, cep: formatCep(digits), street: data.logradouro || "", district: data.bairro || "", city: data.localidade || "", state: data.uf || "" }));
       setCepFound(true);
-      window.setTimeout(() => numberRef.current?.focus(), 50);
     } catch { setError("CEP não encontrado. Confira os números e tente novamente."); }
     finally { setCepLoading(false); }
   }
@@ -246,13 +245,21 @@ export default function CheckoutPage() {
       const result = await response.json().catch(() => ({}));
       if (payment === "pix") {
         if (!response.ok) throw new Error("Não foi possível gerar o Pix agora. Tente novamente.");
+        const pixCode = String(result.pix.qrCode || "");
+        if (!pixCode) throw new Error("A PinPay não retornou um código Pix válido.");
+        const realQrCodeUrl = await QRCode.toDataURL(pixCode, {
+          errorCorrectionLevel: "M",
+          margin: 2,
+          width: 360,
+          color: { dark: "#101828", light: "#ffffff" },
+        });
         const expiresAt = result.pix.expiresAt;
         setPixCharge({
           transactionId: result.transactionId,
           orderCode: result.orderCode || orderCode,
           amount: result.amount,
-          qrCode: result.pix.qrCode,
-          qrCodeUrl: result.pix.qrCodeUrl,
+          qrCode: pixCode,
+          qrCodeUrl: realQrCodeUrl,
           expiresAt,
         });
         setPixExpired(false);
@@ -327,7 +334,7 @@ export default function CheckoutPage() {
             {cepFound && <div className="address-found"><BadgeCheck /> Endereço encontrado. Complete o número e confira os dados.</div>}
             <div className={cepFound ? "form-grid address-grid visible" : "form-grid address-grid"}>
               <label className="full"><span>Rua/Avenida</span><input value={address.street} onChange={(e) => setAddressField("street", e.target.value)} autoComplete="address-line1" /></label>
-              <label><span>Número</span><input ref={numberRef} value={address.number} onChange={(e) => setAddressField("number", e.target.value)} autoComplete="address-line2" placeholder="Número" /></label>
+              <label><span>Número</span><input value={address.number} onChange={(e) => setAddressField("number", e.target.value)} autoComplete="address-line2" placeholder="Número" /></label>
               <label><span>Complemento</span><input value={address.complement} onChange={(e) => setAddressField("complement", e.target.value)} placeholder="Apto, bloco (opcional)" /></label>
               <label><span>Bairro</span><input value={address.district} onChange={(e) => setAddressField("district", e.target.value)} /></label>
               <label><span>Cidade</span><input value={address.city} onChange={(e) => setAddressField("city", e.target.value)} /></label>
@@ -361,7 +368,7 @@ export default function CheckoutPage() {
       </main>
 
       <Dialog open={paymentDialogOpen} onOpenChange={(open) => paymentDialogState !== "processing" && setPaymentDialogOpen(open)}>
-        <DialogContent className="payment-result-modal" showCloseButton={paymentDialogState !== "processing"}>
+        <DialogContent className="payment-result-modal" showCloseButton={paymentDialogState !== "processing"} onOpenAutoFocus={(event) => event.preventDefault()}>
           {paymentDialogState === "processing" && <div className="payment-modal-state processing-state"><span className="payment-status-icon"><LoaderCircle className="spin" /></span><DialogHeader><DialogTitle>Processando pagamento</DialogTitle><DialogDescription>Aguarde um momento. Não feche esta janela.</DialogDescription></DialogHeader><div className="processing-bar"><i /></div><div className="modal-security"><LockKeyhole /> Conexão protegida</div></div>}
           {paymentDialogState === "pixReady" && pixCharge && <div className={pixExpired ? "payment-modal-state pix-ready-state pix-expired" : "payment-modal-state pix-ready-state"}>
             <div className="pix-brand-header"><img className="pix-store-logo" src="/assets/logo-acqualive.png" alt="Acqualive" /><span><img src="/assets/pix.svg" alt="Pix" /> Pagamento Pix</span></div>
@@ -370,7 +377,7 @@ export default function CheckoutPage() {
             {!pixExpired && <>
               {pixCharge.qrCodeUrl ? <div className="pix-qr-frame"><img src={pixCharge.qrCodeUrl} alt="QR Code do pagamento Pix" /></div> : <div className="pix-qr-placeholder"><QrCode /></div>}
               <div className="pix-amount-block"><small>Valor a pagar</small><strong>{money(pixCharge.amount)}</strong></div>
-              <div className="pix-code-area"><span>Código Pix copia e cola</span><div><code>{pixCharge.qrCode}</code><button type="button" onClick={copyPixCode} aria-label="Copiar código Pix">{pixCopied ? <CheckCircle2 /> : <Copy />}</button></div><small>{pixCopied ? "Código copiado com sucesso" : "Toque no botão para copiar"}</small></div>
+              <div className="pix-code-area"><span>Código Pix copia e cola</span><code>{pixCharge.qrCode}</code><button className="pix-copy-code-button" type="button" onClick={copyPixCode}>{pixCopied ? <CheckCircle2 /> : <Copy />}<span>{pixCopied ? "Pix copiado" : "Copiar Pix"}</span></button></div>
               <div className="pix-status-line"><Clock3 /><span>{pixStatusMessage}</span></div>
               <button className="pix-check-button" onClick={() => checkPixStatus(pixCharge, true)} disabled={checkingPix}>{checkingPix ? <LoaderCircle className="spin" /> : <RefreshCw />} Já paguei, verificar agora</button>
             </>}
@@ -383,7 +390,7 @@ export default function CheckoutPage() {
       </Dialog>
 
       <Dialog open={cardDialogOpen} onOpenChange={(open) => cardDialogState !== "processing" && setCardDialogOpen(open)}>
-        <DialogContent className="card-entry-modal" showCloseButton={cardDialogState !== "processing"}>
+        <DialogContent className="card-entry-modal" showCloseButton={cardDialogState !== "processing"} onOpenAutoFocus={(event) => event.preventDefault()}>
           {cardDialogState === "form" && <form className="card-entry-form" onSubmit={submitCard} noValidate>
             <DialogHeader><DialogTitle>Pagamento com cartão</DialogTitle><DialogDescription>Preencha os dados e escolha o parcelamento.</DialogDescription></DialogHeader>
             <div className="card-modal-brands"><img src="/assets/visa.svg" alt="Visa" /><img src="/assets/mastercard.svg" alt="Mastercard" /><span><LockKeyhole /> Ambiente em configuração</span></div>
