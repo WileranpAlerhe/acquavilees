@@ -49,15 +49,18 @@ export function ensureGoogleAnalytics(measurementId?: string) {
   if (!/^G-[A-Z0-9]+$/i.test(id)) return null;
   window.__ACQUALIVE_GA4_ID = id;
   window.dataLayer ||= [];
-  window.gtag ||= function gtag(...args: Parameters<Gtag>) { window.dataLayer?.push(args); } as Gtag;
+  window.gtag ||= function gtag() { window.dataLayer?.push(arguments); } as Gtag;
   if (!window.__ACQUALIVE_GA4_READY) {
     window.__ACQUALIVE_GA4_READY = true;
     window.gtag("js", new Date());
-    window.gtag("config", id, { send_page_view: false, currency: "BRL" });
-    const script = document.createElement("script");
-    script.async = true;
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(id)}`;
-    document.head.appendChild(script);
+    window.gtag("config", id, { send_page_view: false });
+    if (!document.getElementById("acqualive-ga4-script")) {
+      const script = document.createElement("script");
+      script.id = "acqualive-ga4-script";
+      script.async = true;
+      script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(id)}`;
+      document.head.appendChild(script);
+    }
   }
   return window.gtag;
 }
@@ -70,7 +73,7 @@ export function setGoogleAnalyticsMeasurementId(measurementId: string) {
 
   const queuedEvents = window.__ACQUALIVE_GA4_QUEUE || [];
   window.__ACQUALIVE_GA4_QUEUE = [];
-  queuedEvents.forEach(({ name, params }) => gtag("event", name, params));
+  queuedEvents.forEach(({ name, params }) => gtag("event", name, { ...params, send_to: id }));
   return gtag;
 }
 
@@ -82,6 +85,34 @@ export function trackEvent(name: string, params: Record<string, unknown> = {}) {
     window.__ACQUALIVE_GA4_QUEUE = window.__ACQUALIVE_GA4_QUEUE.slice(-100);
     return true;
   }
-  gtag("event", name, params);
+  gtag("event", name, { ...params, send_to: window.__ACQUALIVE_GA4_ID });
   return true;
+}
+
+export async function testGoogleAnalyticsConnection(measurementId: string) {
+  const id = measurementId.trim();
+  if (!/^G-[A-Z0-9]+$/i.test(id)) {
+    return { ok: false, message: "O Measurement ID não foi encontrado ou está inválido." };
+  }
+  const gtag = setGoogleAnalyticsMeasurementId(id);
+  if (!gtag) return { ok: false, message: "Não foi possível iniciar a tag do Google." };
+
+  return await new Promise<{ ok: boolean; message: string }>((resolve) => {
+    let finished = false;
+    const finish = (result: { ok: boolean; message: string }) => {
+      if (finished) return;
+      finished = true;
+      resolve(result);
+    };
+    gtag("event", "analytics_connection_test", {
+      send_to: id,
+      debug_mode: true,
+      event_timeout: 7000,
+      event_callback: () => finish({ ok: true, message: `GA4 conectado. Evento de teste enviado para ${id}.` }),
+    });
+    window.setTimeout(() => finish({
+      ok: false,
+      message: "A tag não respondeu. Desative bloqueadores de anúncios neste navegador e tente novamente.",
+    }), 8000);
+  });
 }

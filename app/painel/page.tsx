@@ -2,13 +2,14 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { BadgeCheck, BarChart3, CircleAlert, Eye, KeyRound, LoaderCircle, LockKeyhole, LogOut, RefreshCw, Server, ShieldCheck } from "lucide-react";
+import { testGoogleAnalyticsConnection } from "@/app/analytics";
 
 type IntegrationStatus = {
   configured: boolean;
   tokenPreview: string | null;
   apiBaseUrl: string;
   webhookUrl: string;
-  analytics: { configured: boolean; measurementId: string | null; streamId: string | null };
+  analytics: { configured: boolean; measurementId: string | null; streamId: string | null; variableName: string | null };
 };
 
 export default function AdminPanelPage() {
@@ -19,6 +20,8 @@ export default function AdminPanelPage() {
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [message, setMessage] = useState("");
   const [testing, setTesting] = useState(false);
+  const [analyticsTesting, setAnalyticsTesting] = useState(false);
+  const [analyticsTest, setAnalyticsTest] = useState<{ ok: boolean; message: string } | null>(null);
 
   const loadStatus = useCallback(async () => {
     const response = await fetch("/api/admin/status", { cache: "no-store" });
@@ -49,6 +52,19 @@ export default function AdminPanelPage() {
       setMessage(data.message || (response.ok ? "Conexão funcionando." : "Falha na conexão."));
     } catch { setMessage("Não foi possível testar a conexão agora."); }
     finally { setTesting(false); }
+  }
+
+  async function testAnalyticsConnection() {
+    setAnalyticsTesting(true);
+    setAnalyticsTest(null);
+    try {
+      const measurementId = status?.analytics?.measurementId || "";
+      setAnalyticsTest(await testGoogleAnalyticsConnection(measurementId));
+    } catch {
+      setAnalyticsTest({ ok: false, message: "Não foi possível executar o teste do GA4 neste navegador." });
+    } finally {
+      setAnalyticsTesting(false);
+    }
   }
 
   async function logout() {
@@ -123,6 +139,7 @@ export default function AdminPanelPage() {
             <span className={status?.analytics?.configured ? "integration-chip active" : "integration-chip"}>{status?.analytics?.configured ? <BadgeCheck /> : <CircleAlert />}{status?.analytics?.configured ? "GA4 configurado" : "GA4 não configurado"}</span>
             {status?.analytics?.measurementId && <code>{status.analytics.measurementId}</code>}
             {status?.analytics?.streamId && <small>Stream ID: {status.analytics.streamId}</small>}
+            {status?.analytics?.variableName && <small>Variável ativa: {status.analytics.variableName}</small>}
           </div>
           <div className="admin-token-example admin-credential-example">
             <span>Variável obrigatória</span><code>GA4_MEASUREMENT_ID</code><span>Valor</span><code>G-XXXXXXXXXX</code>
@@ -136,6 +153,8 @@ export default function AdminPanelPage() {
             <li><span>5</span><div><strong>Salve e faça o Redeploy</strong><p>Marque <b>Production</b>, <b>Preview</b> e <b>Development</b>, salve e publique novamente o último deploy.</p></div></li>
           </ol>
           <div className="analytics-events"><strong>Eventos já configurados</strong><div><span>page_view</span><span>view_item</span><span>add_to_cart</span><span>view_cart</span><span>begin_checkout</span><span>add_shipping_info</span><span>add_payment_info</span><span>pix_generated</span><span>payment_declined</span><span>purchase</span></div></div>
+          <div className="admin-actions"><button onClick={testAnalyticsConnection} disabled={analyticsTesting || !status?.analytics?.configured}>{analyticsTesting ? <LoaderCircle className="spin" /> : <BarChart3 />} Testar GA4 agora</button></div>
+          {analyticsTest && <div className={analyticsTest.ok ? "admin-message success" : "admin-message error"}>{analyticsTest.ok ? <BadgeCheck /> : <CircleAlert />}{analyticsTest.message}</div>}
           <div className="admin-setup-note"><ShieldCheck /><span>Depois do Redeploy, abra o relatório <b>Tempo real</b> do GA4 e navegue pela loja para confirmar o recebimento dos eventos.</span></div>
         </section>
         <section className="admin-webhook-card"><div><ShieldCheck /><span><strong>Endpoint preparado para confirmação</strong><small>{status?.webhookUrl}</small></span></div><p>O checkout acompanha o pagamento diretamente pela API oficial. Nenhum dado de cartão ou token secreto é armazenado no navegador.</p></section>
