@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, LoaderCircle, Minus, Plus, ShoppingBag, Trash2, Truck } from "lucide-react";
 import { CheckoutHeader, OrderSummary } from "@/app/checkout-components";
 import { CartState, PRODUCT_PRICE, REFILL_COMPARE_PRICE, REFILL_PRICE, clearCart, loadCart, money, saveCart } from "@/app/commerce";
+import { REFILL_ITEM, analyticsItems, trackEvent } from "@/app/analytics";
 
 export default function CartPage() {
   const [cart, setCart] = useState<CartState | null>(null);
@@ -12,9 +13,15 @@ export default function CartPage() {
   const [destination, setDestination] = useState("");
   const [cepError, setCepError] = useState("");
   const [loadingCep, setLoadingCep] = useState(false);
+  const viewedCart = useRef(false);
 
   useEffect(() => { setCart(loadCart()); setReady(true); }, []);
   useEffect(() => { if (ready && cart) saveCart(cart); }, [cart, ready]);
+  useEffect(() => {
+    if (!ready || !cart || viewedCart.current) return;
+    viewedCart.current = true;
+    trackEvent("view_cart", { currency: "BRL", value: cart.quantity * PRODUCT_PRICE + (cart.addRefill ? REFILL_PRICE : 0), items: analyticsItems(cart) });
+  }, [cart, ready]);
 
   async function lookupCep() {
     const digits = cep.replace(/\D/g, "");
@@ -45,16 +52,16 @@ export default function CartPage() {
           <article className="cart-item">
             <img src="/assets/terracota-frente.png" alt="Purificador de Água Acqualive Terracota" />
             <div className="cart-item-info"><strong>Purificador de Água Acqualive Terracota</strong><small>Cor: Terracota</small><div className="cart-qty"><button aria-label="Diminuir quantidade" onClick={() => setCart({ ...cart, quantity: Math.max(1, cart.quantity - 1) })}><Minus /></button><span>{cart.quantity}</span><button aria-label="Aumentar quantidade" onClick={() => setCart({ ...cart, quantity: Math.min(10, cart.quantity + 1) })}><Plus /></button></div></div>
-            <div className="cart-item-price"><strong>{money(PRODUCT_PRICE * cart.quantity)}</strong><button aria-label="Remover produto" onClick={() => { clearCart(); setCart(null); }}><Trash2 /> Remover</button></div>
+            <div className="cart-item-price"><strong>{money(PRODUCT_PRICE * cart.quantity)}</strong><button aria-label="Remover produto" onClick={() => { trackEvent("remove_from_cart", { currency: "BRL", value: cart.quantity * PRODUCT_PRICE, items: analyticsItems({ ...cart, addRefill: false }) }); clearCart(); setCart(null); }}><Trash2 /> Remover</button></div>
           </article>
 
           {cart.addRefill && <article className="cart-item compact-item">
             <img src="/assets/refil-nanno.png" alt="Kit Refil Fresh Nanno V" />
             <div className="cart-item-info"><strong>Kit Refil Fresh Nanno V</strong><small>Oferta adicional</small></div>
-            <div className="cart-item-price"><strong>{money(REFILL_PRICE)}</strong><button onClick={() => setCart({ ...cart, addRefill: false })}><Trash2 /> Remover</button></div>
+            <div className="cart-item-price"><strong>{money(REFILL_PRICE)}</strong><button onClick={() => { trackEvent("remove_from_cart", { currency: "BRL", value: REFILL_PRICE, items: [{ ...REFILL_ITEM, quantity: 1 }] }); setCart({ ...cart, addRefill: false }); }}><Trash2 /> Remover</button></div>
           </article>}
 
-          {!cart.addRefill && <button className="refill-offer" onClick={() => setCart({ ...cart, addRefill: true })}><img src="/assets/refil-nanno.png" alt="" /><span><small>OFERTA ESPECIAL</small><strong>Adicione o Kit Refil Fresh Nanno V</strong><b>de {money(REFILL_COMPARE_PRICE)} por {money(REFILL_PRICE)}</b></span><em>Adicionar +</em></button>}
+          {!cart.addRefill && <button className="refill-offer" onClick={() => { trackEvent("add_to_cart", { currency: "BRL", value: REFILL_PRICE, items: [{ ...REFILL_ITEM, quantity: 1 }] }); setCart({ ...cart, addRefill: true }); }}><img src="/assets/refil-nanno.png" alt="" /><span><small>OFERTA ESPECIAL</small><strong>Adicione o Kit Refil Fresh Nanno V</strong><b>de {money(REFILL_COMPARE_PRICE)} por {money(REFILL_PRICE)}</b></span><em>Adicionar +</em></button>}
 
           <section className="shipping-calc"><div className="shipping-heading"><Truck /><span><strong>Calcule a entrega</strong><small>Informe seu CEP para consultar o destino</small></span></div><div className="cep-row"><input value={cep} onChange={(event) => setCep(event.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" placeholder="00000-000" aria-label="CEP" /><button onClick={lookupCep} disabled={loadingCep}>{loadingCep ? <LoaderCircle className="spin" /> : "Calcular"}</button></div>{cepError && <p className="field-error">{cepError}</p>}{destination && <div className="shipping-result"><span><strong>Entrega padrão</strong><small>{destination} • 8 a 12 dias úteis</small></span><b>Grátis</b></div>}</section>
         </section>

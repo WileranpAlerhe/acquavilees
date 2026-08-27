@@ -1,15 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck, ChevronLeft, ChevronRight, CircleUserRound, Menu, Minus,
-  PackageCheck, Play, Plus, Search, ShieldCheck, ShoppingCart, Star,
+  PackageCheck, Plus, Search, ShieldCheck, ShoppingCart, Star,
   ThumbsDown, ThumbsUp, Truck,
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { PRODUCT_PRICE, REFILL_COMPARE_PRICE, REFILL_PRICE, saveCart } from "@/app/commerce";
+import { TERRACOTA_ITEM, analyticsItems, trackEvent } from "@/app/analytics";
 
 const productImages = [
   { src: "/assets/terracota-frente.png", alt: "Purificador Acqualive Terracota de frente" },
@@ -65,6 +66,31 @@ const reviews = [
     text: "Esta será uma avaliação das primeiras impressões, devido que ainda irei mandar uma amostra ao laboratório. Bem, minhas considerações iniciais é que mesmo sem realizar os testes o PH alcalino é simplesmente evidente devido à coloração mais cristalina da água e sabor adocicado. O aparelho possui classificação P1 e C1 do Inmetro, é fácil de limpar, montar e instalar. Creio que qualquer pessoa possa realizar em poucos minutos.",
     likes: 12, dislikes: 1,
   },
+  {
+    name: "ANA PAULA M.", date: "há 8 meses", stars: 5,
+    text: "O design é muito bonito e a montagem foi simples. Ficou perfeito na bancada da cozinha e a água tem um sabor muito agradável.",
+    likes: 18, dislikes: 1, verified: true,
+  },
+  {
+    name: "Carlos Eduardo R.", date: "há 7 meses", stars: 5,
+    text: "Produto bem embalado, torneira de ótima qualidade e tamanho ideal para nossa família. Estamos muito satisfeitos com a compra.",
+    likes: 15, dislikes: 0, verified: true,
+  },
+  {
+    name: "LUCIANA F.", date: "há 5 meses", stars: 5,
+    text: "Além de filtrar muito bem, virou uma peça de decoração. A cor terracota é ainda mais bonita pessoalmente.",
+    likes: 11, dislikes: 0,
+  },
+  {
+    name: "Paulo Henrique S.", date: "há 4 meses", stars: 4,
+    text: "Gostei bastante do purificador. A vazão da torneira é boa e a limpeza é fácil. Recomendo seguir direitinho as instruções do primeiro uso.",
+    likes: 9, dislikes: 1, verified: true,
+  },
+  {
+    name: "MARIANA L.", date: "há 2 meses", stars: 5,
+    text: "Chegou antes do prazo e sem nenhuma avaria. O acabamento é lindo, a capacidade atende bem e a água fica leve para beber.",
+    likes: 7, dislikes: 0,
+  },
 ];
 
 function Stars({ value = 5, size = 19 }: { value?: number; size?: number }) {
@@ -85,8 +111,12 @@ export default function Home() {
   const [added, setAdded] = useState(false);
   const total = useMemo(() => quantity * PRODUCT_PRICE + (addRefill ? REFILL_PRICE : 0), [quantity, addRefill]);
   const formatPrice = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  useEffect(() => {
+    trackEvent("view_item", { currency: "BRL", value: PRODUCT_PRICE, items: [{ ...TERRACOTA_ITEM, quantity: 1 }] });
+  }, []);
   const addToCart = () => {
     saveCart({ quantity, addRefill });
+    trackEvent("add_to_cart", { currency: "BRL", value: total, items: analyticsItems({ quantity, addRefill }) });
     setAdded(true);
     setCartOpen(true);
   };
@@ -170,7 +200,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="video-card" aria-label="Vídeo do produto"><img src="/assets/video-thumb.jpg" alt="Demonstração do purificador Acqualive Terracota" /><button aria-label="Reproduzir vídeo"><Play fill="currentColor" /></button><span>Purificador de Água Acqualive Brasil</span></section>
         <section className="trust-strip" aria-label="Vantagens da compra">
           <div><Truck /><span><strong>Envio seguro</strong> para todo o Brasil</span></div><div><CircleUserRound /><span><strong>Parcele em até 10x</strong> sem juros</span></div>
           <div><ShieldCheck /><span><strong>Compra 100%</strong> segura</span></div><div><PackageCheck /><span><strong>Garantia</strong> de fábrica</span></div>
@@ -186,6 +215,23 @@ export default function Home() {
 
         <section className="description-gallery" aria-label="Imagens da descrição do produto">{descriptionImages.map((image) => <img key={image.src} src={image.src} alt={image.alt} loading="lazy" />)}</section>
 
+        <section className="product-video-section" aria-labelledby="product-video-title">
+          <div className="product-video-heading">
+            <p className="eyebrow">Conheça todos os detalhes</p>
+            <h2 id="product-video-title">Acqualive Terracota em vídeo</h2>
+          </div>
+          <div className="product-video-player">
+            <iframe
+              src="https://www.youtube.com/embed/WEjrg93fkTM?rel=0"
+              title="Purificador de Água Alcalina - Acqualive Terracota"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+              loading="lazy"
+            />
+          </div>
+        </section>
+
         <section id="beneficios" className="health-section"><p className="eyebrow">Hidratação funcional</p><h2>Muito mais saúde</h2><div className="health-card"><span className="health-icon">♨</span><h3>Água anti-inflamatória</h3><p>A água alcalina é considerada anti-inflamatória natural por sua alta taxa de minerais essenciais.</p></div><div className="dots"><span className="active" /><span /><span /></div></section>
 
         <section className="faq-section"><h2>FAQs</h2><Accordion type="single" collapsible className="faq-list">{faq.map((item, index) => <AccordionItem key={item.q} value={`faq-${index}`}><AccordionTrigger>{item.q}</AccordionTrigger><AccordionContent>{item.a}</AccordionContent></AccordionItem>)}</Accordion></section>
@@ -200,6 +246,34 @@ export default function Home() {
           </article>)}</div>
         </section>
       </main>
+
+      <footer className="site-footer">
+        <div className="footer-main">
+          <div className="footer-brand">
+            <img src="/assets/logo-acqualive.png" alt="Acqualive" />
+            <p>Água pura, alcalina e segura para cuidar da sua rotina todos os dias.</p>
+          </div>
+          <nav className="footer-links" aria-label="Atendimento e informações">
+            <h2>Atendimento</h2>
+            <a href="#produto">Produto</a>
+            <a href="#descricao">Descrição e cuidados</a>
+            <a href="#beneficios">Benefícios</a>
+            <a href="#avaliacoes">Avaliações</a>
+          </nav>
+          <div className="footer-security">
+            <h2>Compra segura</h2>
+            <span><ShieldCheck /> Ambiente protegido</span>
+            <span><PackageCheck /> Garantia de fábrica</span>
+            <span><Truck /> Entrega para todo o Brasil</span>
+          </div>
+          <div className="footer-payments">
+            <h2>Formas de pagamento</h2>
+            <div><img src="/assets/pix.svg" alt="Pix" /><img src="/assets/visa.svg" alt="Visa" /><img src="/assets/mastercard.svg" alt="Mastercard" /></div>
+            <p>Pix com desconto ou cartão em até 10x sem juros.</p>
+          </div>
+        </div>
+        <div className="footer-bottom"><span>© {new Date().getFullYear()} Acqualive. Todos os direitos reservados.</span><span>Compra protegida • Pagamento seguro</span></div>
+      </footer>
 
       <div className="mobile-buybar"><div><strong>Purificador de Água Acqualive Terracota</strong><span>{formatPrice(PRODUCT_PRICE)}</span></div><button onClick={addToCart} aria-label="Adicionar ao carrinho"><ShoppingCart /></button></div>
     </div>

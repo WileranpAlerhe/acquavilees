@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckoutHeader, OrderSummary } from "@/app/checkout-components";
 import { CartState, cartSubtotal, clearCart, loadCart, money } from "@/app/commerce";
+import { analyticsItems, trackEvent } from "@/app/analytics";
 
 type Customer = { name: string; email: string; phone: string; cpf: string };
 type Address = { cep: string; street: string; number: string; complement: string; district: string; city: string; state: string };
@@ -34,7 +35,12 @@ export default function CheckoutPage() {
   const numberRef = useRef<HTMLInputElement>(null);
   const pollTimerRef = useRef<number | null>(null);
 
-  useEffect(() => { setCart(loadCart()); setReady(true); }, []);
+  useEffect(() => {
+    const loadedCart = loadCart();
+    setCart(loadedCart);
+    setReady(true);
+    if (loadedCart) trackEvent("begin_checkout", { currency: "BRL", value: cartSubtotal(loadedCart), items: analyticsItems(loadedCart) });
+  }, []);
 
   function setCustomerField(field: keyof Customer, value: string) { setCustomer((current) => ({ ...current, [field]: value })); }
   function setAddressField(field: keyof Address, value: string) { setAddress((current) => ({ ...current, [field]: value })); }
@@ -88,7 +94,7 @@ export default function CheckoutPage() {
     try {
       const response = await fetch(`/api/payments/status/${encodeURIComponent(charge.transactionId)}`, { cache: "no-store" });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.message || "Não foi possível consultar agora.");
+      if (!response.ok) throw new Error("Não foi possível verificar o pagamento agora.");
       if (["approved", "paid", "payment_approved"].includes(String(result.status).toLowerCase())) {
         if (pollTimerRef.current) window.clearTimeout(pollTimerRef.current);
         setPixStatusMessage("Pagamento aprovado!");
@@ -124,6 +130,11 @@ export default function CheckoutPage() {
     if (validationError) { setError(validationError); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
 
     setError("");
+    const analyticsSubtotal = cartSubtotal(cart);
+    const analyticsShipping = shipping === "express" ? 29.9 : 0;
+    const analyticsDiscount = payment === "pix" ? analyticsSubtotal * (pixBonus ? 0.1 : 0.05) : 0;
+    trackEvent("add_shipping_info", { currency: "BRL", value: analyticsSubtotal + analyticsShipping - analyticsDiscount, shipping_tier: shipping, items: analyticsItems(cart) });
+    trackEvent("add_payment_info", { currency: "BRL", value: analyticsSubtotal + analyticsShipping - analyticsDiscount, payment_type: payment, items: analyticsItems(cart) });
     setPaymentDialogState("processing");
     setPaymentDialogOpen(true);
     try {
@@ -144,7 +155,7 @@ export default function CheckoutPage() {
       });
       const result = await response.json().catch(() => ({}));
       if (payment === "pix") {
-        if (!response.ok) throw new Error(result.message || "Não foi possível gerar o Pix agora.");
+        if (!response.ok) throw new Error("Não foi possível gerar o Pix agora. Tente novamente.");
         setPixCharge({
           transactionId: result.transactionId,
           orderCode: result.orderCode || orderCode,
@@ -154,6 +165,7 @@ export default function CheckoutPage() {
           expiresAt: result.pix.expiresAt,
         });
         setPixStatusMessage("Aguardando o pagamento...");
+        trackEvent("pix_generated", { currency: "BRL", value: result.amount, transaction_id: result.transactionId, order_id: result.orderCode || orderCode, items: analyticsItems(cart) });
         setPaymentDialogState("pixReady");
         return;
       }
@@ -161,6 +173,7 @@ export default function CheckoutPage() {
       if (response.ok) {
         finalizeOrder("card", 0);
       } else if (response.status === 402 || declineCodes.has(String(result.code))) {
+        trackEvent("payment_declined", { payment_type: "card", order_id: orderCode, value: cartSubtotal(cart) + (shipping === "express" ? 29.9 : 0), currency: "BRL" });
         setPixBonus(true);
         setPaymentDialogState("declined");
       } else {
@@ -225,16 +238,14 @@ export default function CheckoutPage() {
           <section className="checkout-card">
             <div className="section-heading"><span>4</span><CreditCard /><div><h2>Pagamento</h2><p>Selecione a forma de pagamento</p></div></div>
             <RadioGroup value={payment} onValueChange={setPayment} className="option-list payment-options">
-              <label className={payment === "pix" ? "checkout-option professional-option payment-option selected" : "checkout-option professional-option payment-option"}><RadioGroupItem value="pix" /><span className="option-visual pix-visual"><QrCode /></span><span><strong>Pix <em>Recomendado</em></strong><small>Aprovação rápida • pagamento protegido</small></span><b className="discount-badge"><BadgePercent /> {pixBonus ? "10% OFF" : "5% OFF"}</b></label>
-              <label className={payment === "card" ? "checkout-option professional-option payment-option selected" : "checkout-option professional-option payment-option"}><RadioGroupItem value="card" /><span className="option-visual card-visual"><CreditCard /></span><span><strong>Cartão de crédito</strong><small>Parcele em até 10x sem juros</small></span><span className="card-brands"><b>VISA</b><b>●●</b></span></label>
+              <label className={payment === "pix" ? "checkout-option professional-option payment-option selected" : "checkout-option professional-option payment-option"}><RadioGroupItem value="pix" /><span className="option-visual pix-visual"><img src="/assets/pix.svg" alt="" /></span><span><strong>Pix <em>Recomendado</em></strong><small>Aprovação rápida • pagamento protegido</small></span><b className="discount-badge"><BadgePercent /> {pixBonus ? "10% OFF" : "5% OFF"}</b></label>
+              <label className={payment === "card" ? "checkout-option professional-option payment-option selected" : "checkout-option professional-option payment-option"}><RadioGroupItem value="card" /><span className="option-visual card-visual"><CreditCard /></span><span><strong>Cartão de crédito</strong><small>Parcele em até 10x sem juros</small></span><span className="card-brands" aria-label="Aceitamos Visa e Mastercard"><img src="/assets/visa.svg" alt="Visa" /><img src="/assets/mastercard.svg" alt="Mastercard" /></span></label>
             </RadioGroup>
-            {payment === "card" && <div className="gateway-card-placeholder professional-payment-info"><LockKeyhole /><div><strong>Pagamento protegido pelo gateway</strong><p>Os campos seguros do cartão serão carregados pela integração autorizada. Este site não armazena número, validade ou código de segurança.</p><div className="security-seals"><span><ShieldCheck /> Dados criptografados</span><span>PCI</span></div></div></div>}
-            {payment === "pix" && <div className={pixBonus ? "pix-info professional-payment-info bonus-active" : "pix-info professional-payment-info"}><span className="pix-info-icon"><Sparkles /></span><div><strong>{pixBonus ? "Oferta especial desbloqueada: 10% OFF" : "Economize 5% pagando com Pix"}</strong><p>Após finalizar, o gateway conectado gerará um QR Code e o código copia e cola com validade controlada.</p></div></div>}
+            {payment === "pix" && <div className={pixBonus ? "pix-info professional-payment-info bonus-active" : "pix-info professional-payment-info"}><span className="pix-info-icon"><Sparkles /></span><div><strong>{pixBonus ? "Oferta especial desbloqueada: 10% OFF" : "Economize 5% pagando com Pix"}</strong></div></div>}
           </section>
 
           <label className="terms-row"><Checkbox checked={terms} onCheckedChange={(checked) => setTerms(checked === true)} /><span>Li e concordo com os termos de compra e com a política de privacidade.</span></label>
           <button className="place-order" type="submit"><LockKeyhole /> {payment === "card" ? "Processar cartão" : "Finalizar com Pix"} • {money(checkoutTotal)}</button>
-          <p className="gateway-disclaimer">O Pix é gerado com segurança pela PinPay. A confirmação ocorre automaticamente após o pagamento.</p>
         </form>
 
         <div className="checkout-aside"><OrderSummary cart={cart} shipping={shippingPrice} pixDiscountRate={pixDiscountRate} /></div>
@@ -242,10 +253,10 @@ export default function CheckoutPage() {
 
       <Dialog open={paymentDialogOpen} onOpenChange={(open) => paymentDialogState !== "processing" && setPaymentDialogOpen(open)}>
         <DialogContent className="payment-result-modal" showCloseButton={paymentDialogState !== "processing"}>
-          {paymentDialogState === "processing" && <div className="payment-modal-state processing-state"><span className="payment-status-icon"><LoaderCircle className="spin" /></span><DialogHeader><DialogTitle>Processando pagamento</DialogTitle><DialogDescription>Aguardando a resposta segura do processador. Não feche esta janela.</DialogDescription></DialogHeader><div className="processing-bar"><i /></div><div className="modal-security"><LockKeyhole /> Conexão protegida</div></div>}
-          {paymentDialogState === "pixReady" && pixCharge && <div className="payment-modal-state pix-ready-state"><span className="pix-modal-brand"><QrCode /> Pix gerado com segurança</span><DialogHeader><DialogTitle>Escaneie para pagar</DialogTitle><DialogDescription>Abra o app do seu banco, escaneie o QR Code ou use o código copia e cola.</DialogDescription></DialogHeader>{pixCharge.qrCodeUrl ? <div className="pix-qr-frame"><img src={pixCharge.qrCodeUrl} alt="QR Code do pagamento Pix" /></div> : <div className="pix-qr-placeholder"><QrCode /></div>}<strong className="pix-modal-total">{money(pixCharge.amount)}</strong><button className="pix-copy-button" onClick={copyPixCode}>{pixCopied ? <CheckCircle2 /> : <Copy />}{pixCopied ? "Código copiado" : "Copiar código Pix"}</button><div className="pix-status-line"><Clock3 /><span>{pixStatusMessage}</span></div><button className="pix-check-button" onClick={() => checkPixStatus(pixCharge, true)} disabled={checkingPix}>{checkingPix ? <LoaderCircle className="spin" /> : <RefreshCw />} Já paguei, verificar agora</button><small className="pix-expiration">{pixCharge.expiresAt ? `Válido até ${new Date(pixCharge.expiresAt).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "A cobrança possui validade controlada pela PinPay."}</small></div>}
-          {paymentDialogState === "declined" && <div className="payment-modal-state declined-state"><span className="payment-status-icon"><AlertCircle /></span><DialogHeader><DialogTitle>Cartão não autorizado</DialogTitle><DialogDescription>O processador informou que a transação não foi aprovada. Nenhum valor foi cobrado.</DialogDescription></DialogHeader><div className="pix-recovery-offer"><BadgePercent /><div><small>OFERTA LIBERADA</small><strong>Finalize no Pix com 10% OFF</strong><span>Seu novo total é {money(cartSubtotal(cart) + shippingPrice - cartSubtotal(cart) * 0.1)}</span></div></div><button className="modal-primary-action" onClick={() => { setPayment("pix"); setPaymentDialogOpen(false); }}>Usar Pix com 10% OFF</button><button className="modal-secondary-action" onClick={() => setPaymentDialogOpen(false)}>Voltar ao checkout</button></div>}
-          {paymentDialogState === "unavailable" && <div className="payment-modal-state unavailable-state"><span className="payment-status-icon"><AlertCircle /></span><DialogHeader><DialogTitle>{payment === "pix" ? "Pix indisponível no momento" : "Cartão indisponível no momento"}</DialogTitle><DialogDescription>{payment === "pix" ? "Não foi possível gerar a cobrança. Confira a integração PinPay ou tente novamente em instantes." : "A integração do cartão ainda não está ativa. Nenhuma transação foi enviada e nenhum valor foi cobrado."}</DialogDescription></DialogHeader>{payment === "card" && <button className="modal-primary-action" onClick={() => { setPayment("pix"); setPaymentDialogOpen(false); }}>Escolher pagamento por Pix</button>}<button className="modal-secondary-action" onClick={() => setPaymentDialogOpen(false)}>Voltar ao checkout</button></div>}
+          {paymentDialogState === "processing" && <div className="payment-modal-state processing-state"><span className="payment-status-icon"><LoaderCircle className="spin" /></span><DialogHeader><DialogTitle>Processando pagamento</DialogTitle><DialogDescription>Aguarde um momento. Não feche esta janela.</DialogDescription></DialogHeader><div className="processing-bar"><i /></div><div className="modal-security"><LockKeyhole /> Conexão protegida</div></div>}
+          {paymentDialogState === "pixReady" && pixCharge && <div className="payment-modal-state pix-ready-state"><span className="pix-modal-brand"><QrCode /> Pix gerado com segurança</span><DialogHeader><DialogTitle>Escaneie para pagar</DialogTitle><DialogDescription>Abra o app do seu banco, escaneie o QR Code ou use o código copia e cola.</DialogDescription></DialogHeader>{pixCharge.qrCodeUrl ? <div className="pix-qr-frame"><img src={pixCharge.qrCodeUrl} alt="QR Code do pagamento Pix" /></div> : <div className="pix-qr-placeholder"><QrCode /></div>}<strong className="pix-modal-total">{money(pixCharge.amount)}</strong><button className="pix-copy-button" onClick={copyPixCode}>{pixCopied ? <CheckCircle2 /> : <Copy />}{pixCopied ? "Código copiado" : "Copiar código Pix"}</button><div className="pix-status-line"><Clock3 /><span>{pixStatusMessage}</span></div><button className="pix-check-button" onClick={() => checkPixStatus(pixCharge, true)} disabled={checkingPix}>{checkingPix ? <LoaderCircle className="spin" /> : <RefreshCw />} Já paguei, verificar agora</button>{pixCharge.expiresAt && <small className="pix-expiration">Válido até {new Date(pixCharge.expiresAt).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</small>}</div>}
+          {paymentDialogState === "declined" && <div className="payment-modal-state declined-state"><span className="payment-status-icon"><AlertCircle /></span><DialogHeader><DialogTitle>Cartão não autorizado</DialogTitle><DialogDescription>Seu cartão não foi aprovado. Nenhum valor foi cobrado.</DialogDescription></DialogHeader><div className="pix-recovery-offer"><BadgePercent /><div><small>OFERTA LIBERADA</small><strong>Finalize no Pix com 10% OFF</strong><span>Seu novo total é {money(cartSubtotal(cart) + shippingPrice - cartSubtotal(cart) * 0.1)}</span></div></div><button className="modal-primary-action" onClick={() => { setPayment("pix"); setPaymentDialogOpen(false); }}>Usar Pix com 10% OFF</button><button className="modal-secondary-action" onClick={() => setPaymentDialogOpen(false)}>Voltar ao checkout</button></div>}
+          {paymentDialogState === "unavailable" && <div className="payment-modal-state unavailable-state"><span className="payment-status-icon"><AlertCircle /></span><DialogHeader><DialogTitle>{payment === "pix" ? "Pix indisponível no momento" : "Cartão indisponível no momento"}</DialogTitle><DialogDescription>{payment === "pix" ? "Não foi possível gerar o Pix. Tente novamente em instantes." : "Escolha outra forma de pagamento para continuar."}</DialogDescription></DialogHeader>{payment === "card" && <button className="modal-primary-action" onClick={() => { setPayment("pix"); setPaymentDialogOpen(false); }}>Escolher pagamento por Pix</button>}<button className="modal-secondary-action" onClick={() => setPaymentDialogOpen(false)}>Voltar ao checkout</button></div>}
         </DialogContent>
       </Dialog>
     </div>

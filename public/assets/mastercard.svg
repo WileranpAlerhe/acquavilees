@@ -1,0 +1,7 @@
+<svg role="img" viewBox="0 0 64 40" xmlns="http://www.w3.org/2000/svg">
+  <title>Mastercard</title>
+  <circle cx="25" cy="18" r="13" fill="#EB001B"/>
+  <circle cx="39" cy="18" r="13" fill="#F79E1B"/>
+  <path fill="#FF5F00" d="M32 7.9a13 13 0 0 1 0 20.2 13 13 0 0 1 0-20.2Z"/>
+  <text x="32" y="37" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="5" font-weight="700" fill="#202124">mastercard</text>
+</svg>
