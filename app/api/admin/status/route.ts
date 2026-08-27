@@ -8,8 +8,8 @@ export async function GET(request: Request) {
   }
 
   const token = getPinPayToken();
-  const gaMeasurementId = process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID?.trim() || "";
-  const gaStreamId = process.env.NEXT_PUBLIC_GA4_STREAM_ID?.trim() || "";
+  const gaMeasurementId = process.env.GA4_MEASUREMENT_ID?.trim() || "";
+  const gaStreamId = process.env.GA4_STREAM_ID?.trim() || "";
   return NextResponse.json({
     ok: true,
     configured: Boolean(token),

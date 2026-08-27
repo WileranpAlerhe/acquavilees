@@ -10,10 +10,9 @@ declare global {
     gtag?: Gtag;
     __ACQUALIVE_GA4_READY?: boolean;
     __ACQUALIVE_GA4_PAGE?: string;
+    __ACQUALIVE_GA4_ID?: string;
   }
 }
-
-export const GA4_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID?.trim() || "";
 
 export const TERRACOTA_ITEM = {
   item_id: "acqualive-terracota",
@@ -38,17 +37,25 @@ export function analyticsItems(cart: CartState) {
   ];
 }
 
-export function ensureGoogleAnalytics() {
-  if (typeof window === "undefined" || !/^G-[A-Z0-9]+$/i.test(GA4_MEASUREMENT_ID)) return null;
+export function ensureGoogleAnalytics(measurementId?: string) {
+  if (typeof window === "undefined") return null;
+  const id = (
+    measurementId ||
+    window.__ACQUALIVE_GA4_ID ||
+    document.documentElement.dataset.ga4MeasurementId ||
+    ""
+  ).trim();
+  if (!/^G-[A-Z0-9]+$/i.test(id)) return null;
+  window.__ACQUALIVE_GA4_ID = id;
   window.dataLayer ||= [];
   window.gtag ||= function gtag(...args: Parameters<Gtag>) { window.dataLayer?.push(args); } as Gtag;
   if (!window.__ACQUALIVE_GA4_READY) {
     window.__ACQUALIVE_GA4_READY = true;
     window.gtag("js", new Date());
-    window.gtag("config", GA4_MEASUREMENT_ID, { send_page_view: false, currency: "BRL" });
+    window.gtag("config", id, { send_page_view: false, currency: "BRL" });
     const script = document.createElement("script");
     script.async = true;
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA4_MEASUREMENT_ID)}`;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(id)}`;
     document.head.appendChild(script);
   }
   return window.gtag;
@@ -60,4 +67,3 @@ export function trackEvent(name: string, params: Record<string, unknown> = {}) {
   gtag("event", name, params);
   return true;
 }
-

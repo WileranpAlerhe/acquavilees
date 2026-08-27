@@ -125,14 +125,14 @@ export default function AdminPanelPage() {
             {status?.analytics?.streamId && <small>Stream ID: {status.analytics.streamId}</small>}
           </div>
           <div className="admin-token-example admin-credential-example">
-            <span>Variável obrigatória</span><code>NEXT_PUBLIC_GA4_MEASUREMENT_ID</code><span>Valor</span><code>G-XXXXXXXXXX</code>
-            <span>Variável opcional</span><code>NEXT_PUBLIC_GA4_STREAM_ID</code><span>Valor</span><code>1234567890</code>
+            <span>Variável obrigatória</span><code>GA4_MEASUREMENT_ID</code><span>Valor</span><code>G-XXXXXXXXXX</code>
+            <span>Variável opcional</span><code>GA4_STREAM_ID</code><span>Valor</span><code>1234567890</code>
           </div>
           <ol className="admin-setup-steps">
             <li><span>1</span><div><strong>Encontre o Measurement ID no GA4</strong><p>No Google Analytics, abra <b>Administrador → Fluxos de dados → Web</b>, selecione o site e copie o código que começa com <code>G-</code>.</p></div></li>
             <li><span>2</span><div><strong>Abra as variáveis na Vercel</strong><p>Entre no projeto e acesse <b>Settings → Environment Variables</b>.</p></div></li>
-            <li><span>3</span><div><strong>Cadastre o Measurement ID</strong><p>Crie <code>NEXT_PUBLIC_GA4_MEASUREMENT_ID</code> e cole o código <code>G-...</code>. Esse é o único campo obrigatório.</p></div></li>
-            <li><span>4</span><div><strong>Cadastre o Stream ID, se desejar</strong><p>Crie <code>NEXT_PUBLIC_GA4_STREAM_ID</code> e cole o número do fluxo. Ele serve para identificar a configuração neste painel.</p></div></li>
+            <li><span>3</span><div><strong>Cadastre o Measurement ID</strong><p>Crie <code>GA4_MEASUREMENT_ID</code> e cole o código <code>G-...</code>. Não use o prefixo <code>NEXT_PUBLIC_</code>.</p></div></li>
+            <li><span>4</span><div><strong>Cadastre o Stream ID, se desejar</strong><p>Crie <code>GA4_STREAM_ID</code> e cole o número do fluxo. Ele serve para identificar a configuração neste painel.</p></div></li>
             <li><span>5</span><div><strong>Salve e faça o Redeploy</strong><p>Marque <b>Production</b>, <b>Preview</b> e <b>Development</b>, salve e publique novamente o último deploy.</p></div></li>
           </ol>
           <div className="analytics-events"><strong>Eventos já configurados</strong><div><span>page_view</span><span>view_item</span><span>add_to_cart</span><span>view_cart</span><span>begin_checkout</span><span>add_shipping_info</span><span>add_payment_info</span><span>pix_generated</span><span>payment_declined</span><span>purchase</span></div></div>
