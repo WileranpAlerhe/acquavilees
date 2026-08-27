@@ -351,8 +351,6 @@ main { padding-bottom: 44px; }
 .security-seals { margin-top: 9px; display: flex; align-items: center; gap: 8px; }
 .security-seals span { min-height: 25px; padding: 4px 7px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid #dce2ea; border-radius: 4px; color: #637083; background: white; font-size: 8px; font-weight: 700; }
 .security-seals svg { width: 12px; color: #176c50; }
-.terms-row { margin: 16px 4px; display: flex; align-items: flex-start; gap: 9px; color: #697281; font-size: 11px; line-height: 1.45; }
-.terms-row [data-slot="checkbox"] { margin-top: 1px; border-color: #aeb6c2; }
 .place-order { width: 100%; min-height: 54px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 6px; background: #f05a08; color: white; font-size: 14px; font-weight: 800; }
 .place-order svg { width: 18px; }
 .gateway-disclaimer { margin: 9px 0 0; color: #8a919d; text-align: center; font-size: 9px; }
@@ -606,7 +604,6 @@ main { padding-bottom: 44px; }
   .card-entry-form { padding: 22px 18px; }
   .card-modal-brands span { display: none; }
   .payment-modal-state { padding: 27px 20px 22px; }
-  .terms-row { margin-left: 2px; margin-right: 2px; }
   .place-order { position: sticky; bottom: 8px; z-index: 8; box-shadow: 0 7px 24px rgba(240,90,8,.25); }
   .checkout-aside { order: -1; }
   .checkout-aside .order-summary { padding: 16px; }

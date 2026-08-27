@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { AlertCircle, BadgeCheck, BadgePercent, CheckCircle2, Clock3, Copy, CreditCard, LoaderCircle, LockKeyhole, MapPin, PackageCheck, QrCode, RefreshCw, ShieldCheck, Truck, UserRound } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckoutHeader, OrderSummary } from "@/app/checkout-components";
@@ -16,6 +15,10 @@ type PaymentDialogState = "idle" | "processing" | "pixReady" | "declined" | "una
 type PixCharge = { transactionId: string; orderCode: string; amount: number; qrCode: string; qrCodeUrl: string; expiresAt: string | null };
 type CardDialogState = "form" | "processing" | "unavailable";
 type CardDetails = { holder: string; number: string; expiry: string; cvv: string; installments: string };
+type CheckoutSession = { customer: Customer; address: Address; shipping: string; payment: string; cepFound: boolean };
+
+const CHECKOUT_SESSION_KEY = "acqualive-checkout-session-v1";
+const CHECKOUT_ANALYTICS_KEY = "acqualive-checkout-analytics-started";
 
 function onlyDigits(value: string, limit: number) {
   return value.replace(/\D/g, "").slice(0, limit);
@@ -63,7 +66,6 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState<Address>({ cep: "", street: "", number: "", complement: "", district: "", city: "", state: "" });
   const [shipping, setShipping] = useState("standard");
   const [payment, setPayment] = useState("pix");
-  const [terms, setTerms] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [cepFound, setCepFound] = useState(false);
   const [error, setError] = useState("");
@@ -86,14 +88,36 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     const loadedCart = loadCart();
+    try {
+      const savedSession = window.sessionStorage.getItem(CHECKOUT_SESSION_KEY);
+      if (savedSession) {
+        const draft = JSON.parse(savedSession) as Partial<CheckoutSession>;
+        if (draft.customer) setCustomer((current) => ({ ...current, ...draft.customer }));
+        if (draft.address) setAddress((current) => ({ ...current, ...draft.address }));
+        if (draft.shipping === "standard" || draft.shipping === "express") setShipping(draft.shipping);
+        if (draft.payment === "pix" || draft.payment === "card") setPayment(draft.payment);
+        setCepFound(Boolean(draft.cepFound));
+      }
+    } catch {
+      window.sessionStorage.removeItem(CHECKOUT_SESSION_KEY);
+    }
     setCart(loadedCart);
     setReady(true);
-    if (loadedCart) trackEvent("begin_checkout", { currency: "BRL", value: cartSubtotal(loadedCart), items: analyticsItems(loadedCart) });
+    if (loadedCart && !window.sessionStorage.getItem(CHECKOUT_ANALYTICS_KEY)) {
+      trackEvent("begin_checkout", { currency: "BRL", value: cartSubtotal(loadedCart), items: analyticsItems(loadedCart) });
+      window.sessionStorage.setItem(CHECKOUT_ANALYTICS_KEY, "1");
+    }
     return () => {
       if (cardTimerRef.current) window.clearTimeout(cardTimerRef.current);
       if (pixCountdownRef.current) window.clearInterval(pixCountdownRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const checkoutSession: CheckoutSession = { customer, address, shipping, payment, cepFound };
+    window.sessionStorage.setItem(CHECKOUT_SESSION_KEY, JSON.stringify(checkoutSession));
+  }, [ready, customer, address, shipping, payment, cepFound]);
 
   function setCustomerField(field: keyof Customer, value: string) { setCustomer((current) => ({ ...current, [field]: value })); }
   function setAddressField(field: keyof Address, value: string) { setAddress((current) => ({ ...current, [field]: value })); }
@@ -125,7 +149,6 @@ export default function CheckoutPage() {
   function validate() {
     if (!customer.name.trim() || !customer.email.includes("@") || customer.phone.replace(/\D/g, "").length !== 11 || customer.cpf.replace(/\D/g, "").length !== 11) return "Preencha corretamente seus dados de identificação.";
     if (!cepFound || !address.street || !address.number || !address.city || !address.state) return "Consulte o CEP e complete o endereço de entrega.";
-    if (!terms) return "Confirme os termos da compra para finalizar.";
     return "";
   }
 
@@ -148,6 +171,8 @@ export default function CheckoutPage() {
       cart,
     };
     window.sessionStorage.setItem("acqualive-last-order", JSON.stringify(order));
+    window.sessionStorage.removeItem(CHECKOUT_SESSION_KEY);
+    window.sessionStorage.removeItem(CHECKOUT_ANALYTICS_KEY);
     clearCart();
     window.location.assign("/pedido-confirmado");
   }
@@ -360,7 +385,6 @@ export default function CheckoutPage() {
             {payment === "pix" && <div className={pixBonus ? "pix-info professional-payment-info bonus-active" : "pix-info professional-payment-info"}><div><strong>{pixBonus ? "Oferta especial desbloqueada: 10% OFF" : "Economize 5% pagando com Pix"}</strong></div></div>}
           </section>
 
-          <label className="terms-row"><Checkbox checked={terms} onCheckedChange={(checked) => setTerms(checked === true)} /><span>Li e concordo com os termos de compra e com a política de privacidade.</span></label>
           <button className="place-order" type="submit"><LockKeyhole /> {payment === "card" ? "Processar cartão" : "Finalizar com Pix"} • {money(checkoutTotal)}</button>
         </form>
 

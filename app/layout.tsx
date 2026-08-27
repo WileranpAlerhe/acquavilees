@@ -17,7 +17,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const configuredMeasurementId = process.env.GA4_MEASUREMENT_ID?.trim() || "";
+  const configuredMeasurementId = (
+    process.env.GA4_MEASUREMENT_ID || process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID || ""
+  ).trim();
   const measurementId = /^G-[A-Z0-9]+$/i.test(configuredMeasurementId)
     ? configuredMeasurementId
     : "";

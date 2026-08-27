@@ -11,6 +11,7 @@ declare global {
     __ACQUALIVE_GA4_READY?: boolean;
     __ACQUALIVE_GA4_PAGE?: string;
     __ACQUALIVE_GA4_ID?: string;
+    __ACQUALIVE_GA4_QUEUE?: Array<{ name: string; params: Record<string, unknown> }>;
   }
 }
 
@@ -61,9 +62,26 @@ export function ensureGoogleAnalytics(measurementId?: string) {
   return window.gtag;
 }
 
+export function setGoogleAnalyticsMeasurementId(measurementId: string) {
+  const id = measurementId.trim();
+  if (!/^G-[A-Z0-9]+$/i.test(id)) return null;
+  const gtag = ensureGoogleAnalytics(id);
+  if (!gtag) return null;
+
+  const queuedEvents = window.__ACQUALIVE_GA4_QUEUE || [];
+  window.__ACQUALIVE_GA4_QUEUE = [];
+  queuedEvents.forEach(({ name, params }) => gtag("event", name, params));
+  return gtag;
+}
+
 export function trackEvent(name: string, params: Record<string, unknown> = {}) {
   const gtag = ensureGoogleAnalytics();
-  if (!gtag) return false;
+  if (!gtag) {
+    window.__ACQUALIVE_GA4_QUEUE ||= [];
+    window.__ACQUALIVE_GA4_QUEUE.push({ name, params });
+    window.__ACQUALIVE_GA4_QUEUE = window.__ACQUALIVE_GA4_QUEUE.slice(-100);
+    return true;
+  }
   gtag("event", name, params);
   return true;
 }
