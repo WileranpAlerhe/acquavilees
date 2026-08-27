@@ -7,6 +7,8 @@ import {
   ShippingMethod,
 } from "@/app/api/payments/pinpay";
 
+const PIX_CHECKOUT_TTL_MS = 5 * 60 * 1000;
+
 type CreatePaymentBody = {
   method?: string;
   orderCode?: string;
@@ -86,7 +88,7 @@ export async function POST(request: Request) {
       pix: {
         qrCode,
         qrCodeUrl: typeof pix.qr_code_url === "string" ? pix.qr_code_url : "",
-        expiresAt: typeof pix.expires_at === "string" ? pix.expires_at : null,
+        expiresAt: new Date(Date.now() + PIX_CHECKOUT_TTL_MS).toISOString(),
       },
     }, { status: 201 });
   } catch (error) {

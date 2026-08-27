@@ -40,6 +40,12 @@ export function cartSubtotal(cart: CartState) {
   return cart.quantity * PRODUCT_PRICE + (cart.addRefill ? REFILL_PRICE : 0);
 }
 
+export function checkoutTotal(subtotal: number, shipping: number, pixDiscountRate = 0) {
+  const baseTotal = subtotal + shipping;
+  if (pixDiscountRate <= 0) return Math.round(baseTotal * 100) / 100;
+  return Math.floor(baseTotal - subtotal * pixDiscountRate);
+}
+
 export function money(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }

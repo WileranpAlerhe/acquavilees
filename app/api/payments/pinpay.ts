@@ -1,3 +1,5 @@
+import { checkoutTotal } from "@/app/commerce";
+
 const PINPAY_BASE_URL = "https://api.usepinpay.com/functions/v1/api-v1";
 
 export type CheckoutCart = {
@@ -20,7 +22,7 @@ export function calculateOrderAmount(
   const subtotal = quantity * 169 + (cart.addRefill ? 50 : 0);
   const shippingPrice = shipping === "express" ? 29.9 : 0;
   const allowedDiscount = pixDiscountRate === 0.1 ? 0.1 : 0.05;
-  const total = subtotal + shippingPrice - subtotal * allowedDiscount;
+  const total = checkoutTotal(subtotal, shippingPrice, allowedDiscount);
 
   return {
     quantity,
@@ -28,7 +30,7 @@ export function calculateOrderAmount(
     shippingPrice,
     discountRate: allowedDiscount,
     total,
-    amountInCents: Math.round(total * 100),
+    amountInCents: total * 100,
   };
 }
 

@@ -1,5 +1,5 @@
 import { LockKeyhole, ShieldCheck } from "lucide-react";
-import { CartState, PRODUCT_PRICE, REFILL_PRICE, cartSubtotal, money } from "@/app/commerce";
+import { CartState, PRODUCT_PRICE, REFILL_PRICE, cartSubtotal, checkoutTotal, money } from "@/app/commerce";
 
 export function CheckoutHeader({ current }: { current: "cart" | "checkout" | "done" }) {
   return (
@@ -21,8 +21,8 @@ export function CheckoutHeader({ current }: { current: "cart" | "checkout" | "do
 
 export function OrderSummary({ cart, shipping = 0, pixDiscountRate = 0, compact = false }: { cart: CartState; shipping?: number; pixDiscountRate?: number; compact?: boolean }) {
   const subtotal = cartSubtotal(cart);
-  const pixDiscount = subtotal * pixDiscountRate;
-  const total = subtotal + shipping - pixDiscount;
+  const total = checkoutTotal(subtotal, shipping, pixDiscountRate);
+  const pixDiscount = pixDiscountRate > 0 ? subtotal + shipping - total : 0;
 
   return (
     <aside className={compact ? "order-summary compact" : "order-summary"}>
@@ -38,7 +38,7 @@ export function OrderSummary({ cart, shipping = 0, pixDiscountRate = 0, compact 
         <b>{money(REFILL_PRICE)}</b>
       </div>}
       <div className="summary-lines"><span>Subtotal <b>{money(subtotal)}</b></span><span>Frete <b>{shipping ? money(shipping) : "Grátis"}</b></span>{pixDiscount > 0 && <span className="discount">Desconto no Pix ({Math.round(pixDiscountRate * 100)}%) <b>- {money(pixDiscount)}</b></span>}</div>
-      <div className="summary-total"><span>Total</span><div><strong>{money(total)}</strong><small>ou em até 10x sem juros</small></div></div>
+      <div className="summary-total"><span>Total</span><div><strong>{money(total)}</strong><small>ou em até 6x sem juros</small></div></div>
       <div className="secure-note"><ShieldCheck /><span><strong>Compra 100% segura</strong><small>Seus dados são protegidos e não armazenamos informações do cartão.</small></span></div>
     </aside>
   );
